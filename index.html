@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pizza Cart</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/axios@1.2/dist/axios.min.js"></script>
+    <script src="./pizza.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body x-data="pizzaCart" x-cloak x-init="init()">
+    <div class="container">
+        <h1 x-text="title"></h1>
+        <div class="cart">
+            <div>
+                Username: <input type="text" x-model="username">
+                <button x-show="!isLoggedIn" @click="login">Login</button>
+                <button x-show="isLoggedIn" @click="logout">Logout</button>
+
+            </div>
+            <div x-show="isLoggedIn">
+                cart_code:<span x-text="cartCode"></span>
+            </div>
+
+            <div x-show="paymentTotal > 0"> <!--write x-show='paymentTotal > 0'-->
+                <h2>Your Cart</h2>
+                <div class="message" x-text="message">Message here</div>
+
+                <table>
+                    <tr>
+                        <th>Flavour</th>
+                        <th>Size</th>
+                        <th>Price</th>
+                        <th>Qty</th>
+                        <th>Total</th>
+                    </tr>
+                    <template x-for="pizza in cartPizzas">
+                        <tr>
+                            <td x-text="pizza.flavour"></td>
+                            <td x-text="pizza.size"></td>
+                            <td x-text="pizza.price"></td>
+                            <td>
+                                <button class="btn" @click="addPizza(pizza.id)">+</button>
+                                x<span x-text="pizza.qty"></span>
+                                <button @click="removePizza(pizza.id)" :disabled="pizza.qty <= 0">-</button>
+                            </td>
+                            <td x-text="pizza.total"></td>
+                        </tr>
+                    </template>
+                    <tr>
+                        <td colspan="4">Total</td>
+                        <td>R <span x-text="cartTotal"></span></td>
+                    </tr>
+                    <tr>
+                        <td colspan="3">Pay Now</td>
+                        <td><input type="text" x-model="paymentAmount"></td>
+                        <td><button @click="payForCart()">Pay</button></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div x-show="isLoggedIn">
+            <h1>!Press Add to add Your Featured Pizzas</h1>
+
+        </div>
+
+        <div class="featured-pizzas">
+
+            <template x-for="pizza in featuredPizzas">
+
+                <div class="featured" x-show="username && cartCode">
+                    <img src="pizza.jpg" alt="Pizza" width="150">
+                    <h4 x-text="pizza.flavour"></h4>
+                    <h5>R <span x-text="pizza.price"></span></h5>
+                    <p x-text="pizza.size"></p>
+                    <button class="btn" @click="addPizza(pizza.id)">Buy</button>
+                </div>
+            </template>
+        </div>
+
+        <div x-show="isLoggedIn">
+            <h1 x-text="title"></h1>
+            <template x-for="pizza in pizzas">
+                <div class="pizza-item">
+                    <img src="image.png">
+                    <h5 x-text="pizza.flavour"></h5>
+                    <span x-text="pizza.size"></span>
+                    <h5>R<span x-text="pizza.price"></span></h5>
+                    <button @click="addPizza(pizza.id)">Buy</button>
+                    <button @click="setFeaturedPizza(pizza.id)">Add</button>
+
+                    <!-- <img x-bind:src="image.png" alt="image png"> -->
+
+                </div>
+                <div>
+                    <button class="btn" x-on-click="addPizzaToCart(pizza.id)"></button>
+                </div>
+            </template>
+        </div>
+        <div x-data="pizzaCartHistory()" x-show="isLoggedIn">
+            <h1>Cart History</h1>
+            <button @click="saveHistory">History</button>
+            <h2>History</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Price</th>    
+                        <th>Status</th>
+                        <th>Flavour</th>
+                        <th>Pizza</th>
+                        <th>Quantity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="cart in history" :key="cart.cart_code">
+                        <template x-for="pizza in cart.pizzas" :key="pizza.id">
+                            <tr>
+                                <td x-text="pizza.price.toFixed(2)"></td>
+                                <td x-text="cart.status"></td>
+                                <td x-text="pizza.type"></td>
+                                <td x-text="pizza.size"></td>
+                                <td x-text="pizza.qty"></td>
+                            </tr>
+                        </template>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- <div>
+            <button @click="fetchHistoricalOrders()">Show Historical Orders</button>
+        </div> -->
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const app = Vue.createApp({
+                data() {
+                    return pizzaCartHistory();
+                },
+                mounted() {
+                    // Example usage: set the username dynamically
+                    this.username = 'example_username';
+                    this.saveHistory(); // Fetch and save the cart history
+                }
+            });
+            app.mount('#app');
+        });
+        function pizzaCartHistory() {
+            return {
+                username: 'madlopatalent', // This will be set dynamically
+                history: [],
+                saveHistory() {
+                    this.username
+                    axios
+                        .get(`https://pizza-api.projectcodex.net/api/pizza-cart/username/${this.username}`)
+                        .then((res) => {
+                            const carts = res.data;
+                            // Iterate over each cart
+                            carts.forEach((cart) => {
+                                if (cart.status === "paid") {
+                                    const cartCode = cart.cart_code;
+                                    // Fetch detailed cart data using cart code
+                                    axios
+                                        .get(`https://pizza-api.projectcodex.net/api/pizza-cart/${cartCode}/get`)
+                                        .then((res) => {
+                                            const cartData = res.data;
+                                            // Push cartData into history array
+                                            this.history.push(cartData);
+                                        })
+                                        .catch((error) => {
+                                            console.error("Error fetching cart details:", error);
+                                        });
+                                }
+                            });
+                        })
+                        .catch((error) => {
+                            console.error("Error fetching cart history:", error);
+                        });
+                }
+            }
+        }
+    </script>
+
+
+</body>
+
+</html>
