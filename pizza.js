@@ -7,43 +7,43 @@ function pizzaCart() {
         cartPizzas: [],
         cartTotal: 0.00,
         paymentAmount: 0.00,
-        cartVisible: true,
         message: '',
         paymentTotal: 0.00,
         featuredPizzas: [],
-        cartId: '',
         isLoggedIn: false,
-        cartId: '',
+        showOrders: false,
         historicalOrders: [],
+
         login() {
             if (this.username.length > 2) {
-                localStorage.setItem('username', this.username)
+                localStorage.setItem('username', this.username);
                 this.createCart();
                 this.getFeaturedPizzas();
                 this.isLoggedIn = true;
+                this.getHistoricalOrders(); // Load historical orders on login
             } else {
-                alert('username is too short');
-                this.cartVisible = false;
+                alert('Username is too short');
             }
         },
+
         logout() {
             if (confirm('Do you want to LogOut?')) {
-                localStorage['cartCode'] = '';
-                this.cartCode = '';
+                localStorage.removeItem('username');
+                localStorage.removeItem('cartCode');
                 this.username = '';
-                localStorage['username'] = '';
+                this.cartCode = '';
                 this.isLoggedIn = false;
                 this.featuredPizzas = [];
             }
-
         },
+
         createCart() {
             if (!this.username) {
                 this.cartCode = 'No User Name to Create a Cart For';
                 return Promise.resolve();
             }
 
-            const cartCode = localStorage['cartCode'];
+            const cartCode = localStorage.getItem('cartCode');
             if (cartCode) {
                 this.cartCode = cartCode;
                 return Promise.resolve();
@@ -52,42 +52,35 @@ function pizzaCart() {
                 return axios.get(createCartURL)
                     .then(result => {
                         this.cartCode = result.data.cart_code;
-                        localStorage['cartCode'] = this.cartCode;
+                        localStorage.setItem('cartCode', this.cartCode);
                     });
             }
         },
-
 
         getCart() {
             const getCartURL = `https://pizza-api.projectcodex.net/api/pizza-cart/${this.cartCode}/get`;
             return axios.get(getCartURL);
         },
-        addPizza(pizzaId) {
 
+        addPizza(pizzaId) {
             return axios.post('https://pizza-api.projectcodex.net/api/pizza-cart/add', {
                 "cart_code": this.cartCode,
                 "pizza_id": pizzaId
-            })
-                .then(() => {
-                    this.showCartData();
-                })
-
+            }).then(() => this.showCartData());
         },
+
         removePizza(pizzaId) {
             return axios.post('https://pizza-api.projectcodex.net/api/pizza-cart/remove', {
                 "cart_code": this.cartCode,
                 "pizza_id": pizzaId
-            })
-                .then(() => {
-                    this.showCartData();
-                })
+            }).then(() => this.showCartData());
         },
+
         pay(amount) {
-            return axios.post('https://pizza-api.projectcodex.net/api/pizza-cart/pay',
-                {
-                    "cart_code": this.cartCode,
-                    amount
-                });
+            return axios.post('https://pizza-api.projectcodex.net/api/pizza-cart/pay', {
+                "cart_code": this.cartCode,
+                amount
+            });
         },
 
         showCartData() {
@@ -111,58 +104,39 @@ function pizzaCart() {
         },
 
         init() {
-            const storedUsername = localStorage['username'];
+            const storedUsername = localStorage.getItem('username');
             if (storedUsername) {
                 this.username = storedUsername;
                 this.isLoggedIn = true;
+                this.createCart().then(() => {
+                    this.showCartData();
+                });
             }
-
 
             axios.get('https://pizza-api.projectcodex.net/api/pizzas', { headers: { 'Cache-Control': 'no-store' } })
                 .then(result => {
                     this.pizzas = result.data.pizzas;
                 });
 
-            if (!this.cartCode) {
-                this.createCart()
-                    .then(() => {
-                        this.showCartData();
-                    });
-            } else {
-                this.showCartData();
-            }
             this.getFeaturedPizzas();
-
         },
+
         addPizzaToCart(pizzaId) {
             return this.addPizza(pizzaId);
         },
-
-        // addPizzaToCart(pizzaId) {
-        //     alert(pizzaId)
-
-        //         // .then(() => {
-        //         //     this.showCartData();
-        //         // })
-        // },
 
         getFeaturedPizzas() {
             const featuredPizzasURL = `https://pizza-api.projectcodex.net/api/pizzas/featured?username=${this.username}`;
             axios.get(featuredPizzasURL, { headers: { 'Cache-Control': 'no-store' } })
                 .then(response => {
-                    if (response.data && Array.isArray(response.data.pizzas)) {
-
-                        this.featuredPizzas = response.data.pizzas.slice(0, 3);
-                    } else {
-
-                        this.featuredPizzas = [];
-                    }
+                    this.featuredPizzas = response.data.pizzas.slice(0, 3);
                 })
                 .catch(error => {
                     console.error('Error fetching featured pizzas:', error);
                     this.featuredPizzas = [];
                 });
         },
+
         setFeaturedPizza(pizzaId) {
             return axios.post('https://pizza-api.projectcodex.net/api/pizzas/featured', {
                 username: this.username,
@@ -171,149 +145,70 @@ function pizzaCart() {
                 this.getFeaturedPizzas();
             });
         },
-        
-        // init() {
-        //     this.fetchHistoryCart();
-        // },
-// fetchHistoryCart(){
-// axios.get(`https://pizza-api.projectcodex.net/api/pizza-cart/username/${this.username}`
-
-// )
-// .then((res) => {
-//     const carts = res.data;
-//     carts.forEach((cart) => {
-//         if (cart.status == 'paid') {
-//          const cartCode = cart.cart_code;
-//          axios.get(
-//             `https://pizza-api.projectcodex.net/api/pizza-cart/${cartCode}/get`
-//          )  
-//          .then((res) => {
-//             const crtData = res.data;
-//             console.log('Cart Data:', cartData);
-//             this.history =[...cartData.pizzas, ...this.history];
-//             console.log('History', this.history);
-//          }); 
-//         }
-        
-//     });
-// })
-// },
 
         payForCart() {
-            this
-                .pay(this.paymentAmount)
-                .then(result => {
-                    if (result.data.status == 'failure') {
-                        this.message = result.data.message;
-                        setTimeout(() => this.message = '', 4000);
+            if (this.paymentAmount <= 0 || this.cartTotal <= 0) {
+                this.message = 'Invalid payment or cart total';
+                setTimeout(() => this.message = '', 4000);
+                return;
+            }
+
+            this.pay(this.paymentAmount).then(result => {
+                if (result.data.status === 'failure') {
+                    this.message = result.data.message;
+                    setTimeout(() => this.message = '', 4000);
+                } else {
+                    const change = this.paymentAmount - this.cartTotal;
+                    if (change > 0) {
+                        this.message = `Payment received. Your change is R${change.toFixed(2)}`;
                     } else {
-                        const change = this.paymentAmount - this.cartTotal;
-                        if (change > 0) {
-                            this.message = `Payment received. Your change is R${change.toFixed(2)}`;
-                        } else {
-                            this.message = 'Payment received';
-                        }
-                        setTimeout(() => {
-                            this.message = '';
-                            this.cartPizzas = [];
-                            this.cartTotal = 0.00;
-                            this.paymentTotal = 0.00; // Update payme
-                            localStorage.removeItem('cartCode');
-                            localStorage['cartCode'] = '';
-                            this.cartCode = '';
-                            this.paymentAmount = 0;
-                            this.createCart();
-                        }, 3000);
+                        this.message = 'Payment received';
                     }
-                });
+
+                    const order = {
+                        total: this.cartTotal,
+                        pizzas: this.cartPizzas
+                    };
+                    this.saveOrderToLocalStorage(order);
+
+                    setTimeout(() => {
+                        this.message = '';
+                        this.cartPizzas = [];
+                        this.cartTotal = 0.00;
+                        this.paymentTotal = 0.00;
+                        localStorage.removeItem('cartCode');
+                        this.cartCode = '';
+                        this.paymentAmount = 0;
+                        this.createCart();
+                    }, 3000);
+                }
+            }).catch(error => {
+                this.message = 'Payment failed. Please try again.';
+                console.error('Payment error:', error);
+                setTimeout(() => this.message = '', 4000);
+            });
         },
 
+        toggleOrders() {
+            this.showOrders = !this.showOrders;
+            if (this.showOrders) {
+                this.getHistoricalOrders();
+            }
+        },
 
+        saveOrderToLocalStorage(order) {
+            let ordersKey = `${this.username}_historicalOrders`;
+            let orders = JSON.parse(localStorage.getItem(ordersKey)) || [];
+            orders.push(order);
+            localStorage.setItem(ordersKey, JSON.stringify(orders));
+        },
 
-        // payFo
-        // payForCart() {
-        //     if (this.paymentAmount < this.cartTotal) {
-        //         this.message = 'Payment failed! Insufficient amount.';
-        //         setTimeout(() => this.message = '', 4000);
-        //         return;
-        //     }
-
-        //     return axios.post('https://pizza-api.projectcodex.net/api/pizza-cart/pay', {
-        //         "cart_code": this.cartCode,
-        //         "payment_amount": this.paymentAmount
-        //     })
-        //     .then(result => {
-        //         console.log('Payment response:', result.data);
-        //         if (result.data.status === 'failure') {
-        //             this.message = result.data.message;
-        //             setTimeout(() => {
-        //                 this.message = '';
-        //             }, 4000);
-        //         } else {
-        //             this.message = 'Payment received';
-        //             setTimeout(() => {
-        //                 this.message = '';
-        //                 this.cartPizzas = [];
-        //                 this.cartTotal = 0.00;
-        //                 this.cartCode = '';
-        //                 this.paymentAmount = 0;
-        //                 this.cartVisible = false; // Hide the cart after successful payment
-        //                 this.createCart();
-        //             }, 3000);
-        //         }
-        //     })
-        // payForCart() {
-        //     return axios.post('https://pizza-api.projectcodex.net/api/pizza-cart/pay', {
-        //         "cart_code": this.cartCode,
-        //         "payment_amount": this.paymentAmount
-        //     })
-        //         .then(result => {
-        //             if (result.data.status = 'failure') {
-        //                 this.message = result.data.message;
-        //                 setTimeout(() => this.message = '', 4000);
-        //             } else {
-        //                 this.message = 'Payment received';
-        //                 setTimeout(() => {
-        //                     this.message = '';
-        //                     this.cartPizzas = [];
-        //                     this.cartTotal = 0.00;
-        //                     this.cartCode = '';
-        //                     this.paymentAmount = 0;
-        //                     this.createCart();
-        //                 }, 3000);
-        //             }
-        //         })
-        // }
-
-
-        // addPizza(pizzaId) {
-        //     console.log(pizzaId);
-        //     const addPizzaURL = 'https://pizza-api.projectcodex.net/api/pizza-cart/add';
-        //     axios.post(addPizzaURL, { pizza_id: pizzaId, cart_code: this.cartCode })
-        //         .then(() => {
-        //             this.showCartData();
-        //         });
-        // },
-        // removePizza(pizzaId) {
-        //     const removePizzaURL = 'https://pizza-api.projectcodex.net/api/pizza-cart/remove';
-        //     axios.post(removePizzaURL, { pizza_id: pizzaId, cart_code: this.cartCode })
-        //         .then(() => {
-        //             this.showCartData();
-        //         });
-        // },
-        // pay() {
-        //     if (this.paymentAmount >= this.cartTotal) {
-        //         this.message = 'Payment successful!';
-        //         this.cartPizzas = [];
-        //         this.cartTotal = 0;
-        //         this.paymentAmount = 0;
-        //     } else {
-        //         this.message = 'Payment failed! Insufficient amount.';
-        //     }
-        // }
+        getHistoricalOrders() {
+            let ordersKey = `${this.username}_historicalOrders`;
+            this.historicalOrders = JSON.parse(localStorage.getItem(ordersKey)) || [];
+        },
     };
 }
-
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('pizzaCart', pizzaCart);
